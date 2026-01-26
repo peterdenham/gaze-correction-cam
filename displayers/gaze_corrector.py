@@ -42,6 +42,15 @@ class CameraConfig:
     camera_offset: tuple[float, float, float] = (0, -21, -1)  # relative to screen center
     video_size: tuple[int, int] = (640, 480)
 
+    def copy(self) -> "CameraConfig":
+        """Create a copy of this config."""
+        return CameraConfig(
+            focal_length=self.focal_length,
+            ipd=self.ipd,
+            camera_offset=self.camera_offset,
+            video_size=self.video_size,
+        )
+
 
 ################################################################################
 # Gaze Correction Model
@@ -185,6 +194,80 @@ class GazeCorrector:
         # Pixel border to cut when replacing eyes (reduces edge artifacts)
         self.pixel_cut = (3, 4)
 
+        # Last estimated eye position (for visualization)
+        self.last_eye_position: list[float] = [0, 0, -60]
+
+    ############################################################################
+    # Camera Offset Adjustment API
+    ############################################################################
+
+    def get_camera_offset(self) -> tuple[float, float, float]:
+        """Get current camera offset (x, y, z) in cm."""
+        return self.camera_cfg.camera_offset
+
+    def set_camera_offset(self, x: float, y: float, z: float) -> None:
+        """
+        Set camera offset relative to screen center.
+
+        Args:
+            x: Horizontal offset in cm (positive = right)
+            y: Vertical offset in cm (positive = down)
+            z: Depth offset in cm (negative = behind screen)
+        """
+        self.camera_cfg.camera_offset = (x, y, z)
+        self.logger.log(f"Camera offset set to: ({x:.1f}, {y:.1f}, {z:.1f})")
+
+    def adjust_camera_offset(self, dx: float = 0, dy: float = 0, dz: float = 0) -> tuple[float, float, float]:
+        """
+        Adjust camera offset by delta values.
+
+        Args:
+            dx: Change in X (horizontal)
+            dy: Change in Y (vertical)
+            dz: Change in Z (depth)
+
+        Returns:
+            New camera offset tuple
+        """
+        x, y, z = self.camera_cfg.camera_offset
+        self.camera_cfg.camera_offset = (x + dx, y + dy, z + dz)
+        return self.camera_cfg.camera_offset
+
+    def get_last_eye_position(self) -> list[float]:
+        """Get the last estimated eye position [x, y, z] in cm."""
+        return self.last_eye_position
+
+    ############################################################################
+    # Focal Length Adjustment API
+    ############################################################################
+
+    def get_focal_length(self) -> float:
+        """Get current focal length in pixels."""
+        return self.camera_cfg.focal_length
+
+    def set_focal_length(self, focal_length: float) -> None:
+        """
+        Set focal length.
+
+        Args:
+            focal_length: Focal length in pixels (typically 500-1000)
+        """
+        self.camera_cfg.focal_length = focal_length
+        self.logger.log(f"Focal length set to: {focal_length:.1f}")
+
+    def adjust_focal_length(self, delta: float) -> float:
+        """
+        Adjust focal length by delta value.
+
+        Args:
+            delta: Change in focal length (pixels)
+
+        Returns:
+            New focal length
+        """
+        self.camera_cfg.focal_length += delta
+        return self.camera_cfg.focal_length
+
     def estimate_gaze_angle(
         self, le_center: tuple[float, float], re_center: tuple[float, float]
     ) -> tuple[list[int], list[float]]:
@@ -221,6 +304,9 @@ class GazeCorrector:
         )
 
         eye_position = [eye_x, eye_y, eye_z]
+
+        # Store for visualization
+        self.last_eye_position = eye_position
 
         # Target gaze point (looking at camera)
         target = (0, 0, 0)
