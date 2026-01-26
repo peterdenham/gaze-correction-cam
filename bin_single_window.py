@@ -11,11 +11,37 @@ Usage:
 
 Controls:
     - 'g': Toggle gaze correction on/off
+    - 'c': Toggle calibration mode
     - 'q': Quit
 """
 
-from displayers.single_window import SingleWindowGazeCorrector
+import cv2
+from displayers.single_window import SingleWindowGazeCorrector, DisplayConfig
 from displayers.face_predictor import create_face_predictor
+
+
+def detect_camera_resolution(camera_id: int) -> tuple[int, int]:
+    """
+    Detect the actual resolution of the specified camera.
+    
+    Args:
+        camera_id: Camera device ID
+        
+    Returns:
+        Tuple of (width, height) in pixels
+    """
+    cap = cv2.VideoCapture(camera_id)
+    if not cap.isOpened():
+        print(f"Warning: Could not open camera {camera_id}, using default resolution")
+        return (640, 480)
+    
+    # Get the actual resolution
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    cap.release()
+    
+    print(f"Detected camera resolution: {width}x{height}")
+    return (width, height)
 
 
 def main():
@@ -27,6 +53,7 @@ def main():
         epilog="""
 Controls:
   'g' - Toggle gaze correction on/off
+  'c' - Toggle calibration mode
   'q' - Quit the application
 
 Examples:
@@ -50,12 +77,27 @@ Examples:
     )
     args = parser.parse_args()
 
+    # Detect camera resolution
+    video_size = detect_camera_resolution(args.camera)
+    
+    # Calculate appropriate face detection size (half resolution)
+    face_detect_size = (video_size[0] // 2, video_size[1] // 2)
+    
+    # Create display config with detected resolution
+    display_config = DisplayConfig(
+        video_size=video_size,
+        face_detect_size=face_detect_size,
+    )
+    
+    print(f"Video size: {video_size}, Face detection size: {face_detect_size}")
+
     # Create face predictor based on selected backend
     predictor = create_face_predictor(args.backend)
 
     # Create and run the corrector
     corrector = SingleWindowGazeCorrector(
         face_predictor=predictor,
+        display_config=display_config,
         camera_id=args.camera,
     )
     corrector.run()
