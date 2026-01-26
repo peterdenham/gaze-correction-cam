@@ -1,6 +1,7 @@
 # Heavy data: stored on the cloud for efficient development
 weights/
 lm_feat/
+models/
 lm_feat.zip
 weights.zip
 
