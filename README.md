@@ -4,6 +4,26 @@
 
 This project implements a gaze correction system for video communication that uses computer vision and deep learning techniques to adjust eye gaze direction in real-time, providing a more natural eye contact experience during video calls. ([study more](./docs/orignal_doc.md))
 
+## Demo
+
+<!--
+Source - Adapted from Stack Overflow
+Retrieved 2026-01-27
+-->
+
+<div style="display: inline-flex; align-items: center;">
+  <!-- Video Thumbnail -->
+  <a href="https://www.youtube.com/watch?v=tOobANsNzOQ" target="_blank" style="display: inline-block;">
+    <img src="https://img.youtube.com/vi/tOobANsNzOQ/0.jpg" style="width: 100%; display: block;">
+  </a>
+
+  <!-- Play Button -->
+  <a href="https://www.youtube.com/watch?v=tOobANsNzOQ" target="_blank" style="display: inline-block;">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_play_button_icon_%282013%E2%80%932017%29.svg" 
+         style="width: 50px; height: auto; margin-left: 5px;">
+  </a>
+</div>
+
 ## Prerequisites
 
 Environment:
