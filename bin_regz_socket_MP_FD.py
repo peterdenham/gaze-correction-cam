@@ -1,8 +1,8 @@
 import time
 import multiprocessing as mp
 
-from displayers.gaze_corrected import GazeCorrectedDisplayer
-from displayers.raw_video import RawVideoDisplayer
+from displayers.dis_gaze_corrected import GazeCorrectedDisplayer
+from displayers.dis_raw_video import RawVideoDisplayer
 
 
 ################################################################################
