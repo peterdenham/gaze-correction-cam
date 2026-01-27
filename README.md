@@ -16,12 +16,6 @@ Retrieved 2026-01-27
   <a href="https://www.youtube.com/watch?v=tOobANsNzOQ" target="_blank">
     <img src="https://img.youtube.com/vi/tOobANsNzOQ/0.jpg" style="width: 320px; display: block;">
   </a>
-
-  <!-- Play Button -->
-  <a href="https://www.youtube.com/watch?v=tOobANsNzOQ" target="_blank" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_play_button_icon_%282013%E2%80%932017%29.svg" 
-         style="width: 50px; height: auto;">
-  </a>
 </div>
 
 ## Prerequisites
