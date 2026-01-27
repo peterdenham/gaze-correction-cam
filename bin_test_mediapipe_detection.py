@@ -23,6 +23,58 @@ from mediapipe.tasks.python.vision import drawing_utils
 from mediapipe.tasks.python.vision import drawing_styles
 
 
+# Landmark Investigation Configuration
+# Define groups of landmark indices to display with different colors
+LANDMARK_GROUPS = [
+    # Left eye (from viewer's perspective)
+    {
+        'name': 'Left Eye',
+        'indices': [362, 385, 387, 263, 373, 380],
+        'color': (0, 255, 0),  # Green (BGR)
+    },
+    # Right eye (from viewer's perspective)
+    {
+        'name': 'Right Eye', 
+        'indices': [33, 160, 158, 133, 153, 144],
+        'color': (255, 0, 0),  # Blue (BGR)
+    },
+    # TODO: Left eye corners
+    # {
+    #     'name': 'Left Eye Corners',
+    #     'indices': [362, 263],
+    #     'color': (0, 255, 255),  # Yellow (BGR)
+    # },
+    {
+        'name': 'Left Eye Corners',
+        'indices': [474, 476],
+        'color': (0, 255, 255),  # Yellow (BGR)
+    },
+    # TODO: Right eye corners
+    # {
+    #     'name': 'Right Eye Corners',
+    #     'indices': [33, 133],
+    #     'color': (255, 255, 0),  # Cyan (BGR)
+    # },
+    {
+        'name': 'Right Eye Corners',
+        'indices': [471, 469],
+        'color': (255, 255, 0),  # Cyan (BGR)
+    },
+    # Nose tip and related
+    {
+        'name': 'Nose',
+        'indices': [1, 4, 5, 6],
+        'color': (0, 0, 255),  # Red (BGR)
+    },
+    # Mouth corners
+    {
+        'name': 'Mouth',
+        'indices': [61, 291, 0, 17],
+        'color': (255, 0, 255),  # Magenta (BGR)
+    },
+]
+
+
 def detect_camera_resolution(camera_id: int) -> tuple[int, int]:
     """
     Detect the actual resolution of the specified camera.
@@ -70,10 +122,12 @@ def run_face_detection(camera_id: int, model_path: str = './models/face_landmark
     )
 
     print(f"Starting camera {camera_id}...")
-    print("Press 'b' to toggle background, 'q' to quit")
+    print("Press 'b' to toggle background, 'c' to toggle contours, 'p' to toggle landmark points, 'q' to quit")
     
     # State
     show_background = True
+    show_landmark_points = False
+    show_contours = True
 
     with FaceLandmarker.create_from_options(options) as landmarker:
         cap = cv2.VideoCapture(camera_id)
@@ -107,45 +161,87 @@ def run_face_detection(camera_id: int, model_path: str = './models/face_landmark
             for idx in range(len(face_landmarks_list)):
                 face_landmarks = face_landmarks_list[idx]
 
-                # Draw face mesh tesselation
-                drawing_utils.draw_landmarks(
-                    image=annotated_image,
-                    landmark_list=face_landmarks,
-                    connections=vision.FaceLandmarksConnections.FACE_LANDMARKS_TESSELATION,
-                    landmark_drawing_spec=None,
-                    connection_drawing_spec=drawing_styles
-                    .get_default_face_mesh_tesselation_style()
-                )
+                # Draw face mesh and contours if enabled
+                if show_contours:
+                    # Draw face mesh tesselation
+                    drawing_utils.draw_landmarks(
+                        image=annotated_image,
+                        landmark_list=face_landmarks,
+                        connections=vision.FaceLandmarksConnections.FACE_LANDMARKS_TESSELATION,
+                        landmark_drawing_spec=None,
+                        connection_drawing_spec=drawing_styles
+                        .get_default_face_mesh_tesselation_style()
+                    )
+                    
+                    # Draw face contours
+                    drawing_utils.draw_landmarks(
+                        image=annotated_image,
+                        landmark_list=face_landmarks,
+                        connections=vision.FaceLandmarksConnections.FACE_LANDMARKS_CONTOURS,
+                        landmark_drawing_spec=None,
+                        connection_drawing_spec=drawing_styles
+                        .get_default_face_mesh_contours_style()
+                    )
+                    
+                    # Draw left iris
+                    drawing_utils.draw_landmarks(
+                        image=annotated_image,
+                        landmark_list=face_landmarks,
+                        connections=vision.FaceLandmarksConnections.FACE_LANDMARKS_LEFT_IRIS,
+                        landmark_drawing_spec=None,
+                        connection_drawing_spec=drawing_styles
+                        .get_default_face_mesh_iris_connections_style()
+                    )
+                    
+                    # Draw right iris
+                    drawing_utils.draw_landmarks(
+                        image=annotated_image,
+                        landmark_list=face_landmarks,
+                        connections=vision.FaceLandmarksConnections.FACE_LANDMARKS_RIGHT_IRIS,
+                        landmark_drawing_spec=None,
+                        connection_drawing_spec=drawing_styles
+                        .get_default_face_mesh_iris_connections_style()
+                    )
                 
-                # Draw face contours
-                drawing_utils.draw_landmarks(
-                    image=annotated_image,
-                    landmark_list=face_landmarks,
-                    connections=vision.FaceLandmarksConnections.FACE_LANDMARKS_CONTOURS,
-                    landmark_drawing_spec=None,
-                    connection_drawing_spec=drawing_styles
-                    .get_default_face_mesh_contours_style()
-                )
-                
-                # Draw left iris
-                drawing_utils.draw_landmarks(
-                    image=annotated_image,
-                    landmark_list=face_landmarks,
-                    connections=vision.FaceLandmarksConnections.FACE_LANDMARKS_LEFT_IRIS,
-                    landmark_drawing_spec=None,
-                    connection_drawing_spec=drawing_styles
-                    .get_default_face_mesh_iris_connections_style()
-                )
-                
-                # Draw right iris
-                drawing_utils.draw_landmarks(
-                    image=annotated_image,
-                    landmark_list=face_landmarks,
-                    connections=vision.FaceLandmarksConnections.FACE_LANDMARKS_RIGHT_IRIS,
-                    landmark_drawing_spec=None,
-                    connection_drawing_spec=drawing_styles
-                    .get_default_face_mesh_iris_connections_style()
-                )
+                # Draw landmark points if enabled
+                if show_landmark_points:
+                    h, w = annotated_image.shape[:2]
+                    for group in LANDMARK_GROUPS:
+                        color = group['color']
+                        for landmark_idx in group['indices']:
+                            if landmark_idx < len(face_landmarks):
+                                landmark = face_landmarks[landmark_idx]
+                                x = int(landmark.x * w)
+                                y = int(landmark.y * h)
+                                # Draw circle
+                                cv2.circle(annotated_image, (x, y), 4, color, -1)
+                                cv2.circle(annotated_image, (x, y), 5, (255, 255, 255), 1)
+                                # Draw index label
+                                cv2.putText(
+                                    annotated_image,
+                                    str(landmark_idx),
+                                    (x + 8, y - 8),
+                                    cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.4,
+                                    color,
+                                    1,
+                                    cv2.LINE_AA
+                                )
+                    
+                    # Draw legend
+                    legend_y = 30
+                    for group in LANDMARK_GROUPS:
+                        cv2.putText(
+                            annotated_image,
+                            f"{group['name']}: {group['indices']}",
+                            (10, legend_y),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.5,
+                            group['color'],
+                            1,
+                            cv2.LINE_AA
+                        )
+                        legend_y += 20
 
             cv2.imshow('MediaPipe Face Landmarker', annotated_image)
             
@@ -156,6 +252,14 @@ def run_face_detection(camera_id: int, model_path: str = './models/face_landmark
                 show_background = not show_background
                 status = "ON" if show_background else "OFF"
                 print(f"Background: {status}")
+            elif key == ord('c'):
+                show_contours = not show_contours
+                status = "ON" if show_contours else "OFF"
+                print(f"Contours: {status}")
+            elif key == ord('p'):
+                show_landmark_points = not show_landmark_points
+                status = "ON" if show_landmark_points else "OFF"
+                print(f"Landmark Points: {status}")
 
         cap.release()
         cv2.destroyAllWindows()
@@ -172,6 +276,8 @@ def main():
         epilog="""
 Controls:
   'b' - Toggle background on/off
+  'c' - Toggle face contours on/off
+  'p' - Toggle landmark points display
   'q' - Quit the application
 
 Examples:

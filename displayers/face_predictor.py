@@ -33,11 +33,11 @@ class EyeData:
     This is the output of eye extraction and input to gaze correction.
     """
 
-    image: np.ndarray  # Eye image normalized to [0, 1], shape (H, W, 3)
-    anchor_map: np.ndarray  # Feature point map, shape (H, W, ef_dim)
-    original_size: tuple[int, int]  # (height, width) before resize
-    top_left: tuple[int, int]  # (row, col) position in original frame
-    center: tuple[float, float]  # Eye center (x, y) in original frame
+    image: np.ndarray              # Eye image normalized to [0, 1], shape (H, W, 3)
+    anchor_map: np.ndarray         # Feature point map, shape (H, W, ef_dim)
+    original_size: tuple[int, int] # (height, width) before resize
+    top_left: tuple[int, int]      # (row, col) position in original frame
+    center: tuple[float, float]    # Eye center (x, y) in original frame
 
 
 @dataclass
@@ -309,9 +309,11 @@ class MediaPipeFacePredictor(FacePredictor):
     LEFT_EYE_INDICES = [362, 385, 387, 263, 373, 380]
     RIGHT_EYE_INDICES = [33, 160, 158, 133, 153, 144]
 
-    # For eye center calculation
-    LEFT_EYE_CORNERS = (362, 263)
-    RIGHT_EYE_CORNERS = (33, 133)
+    # TODO: For eye center calculation
+    # LEFT_EYE_CORNERS = (362, 263)
+    # RIGHT_EYE_CORNERS = (33, 133)
+    LEFT_EYE_CORNERS = (474, 476)
+    RIGHT_EYE_CORNERS = (471, 469)
 
     def __init__(self, model_path: str = "./models/face_landmarker.task"):
         """
