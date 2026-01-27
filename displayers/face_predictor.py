@@ -431,7 +431,8 @@ class MediaPipeFacePredictor(FacePredictor):
         """Extract a single eye region and create anchor map."""
         size_I = config.input_size
         points = eye_landmarks.points
-        eye_cx, eye_cy = eye_landmarks.center
+        eye_cx = sum([pt[0] for pt in points]) / len(points)
+        eye_cy = sum([pt[1] for pt in points]) / len(points)
 
         # MediaPipe uses same logic as dlib for anchor map ordering
         if eye_side == "L":
