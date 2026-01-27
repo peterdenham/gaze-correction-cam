@@ -327,30 +327,12 @@ class SingleWindowGazeCorrector:
         """
         display_frame = frame.copy()
 
-        # For MediaPipe, process the frame first
-        if hasattr(self.face_predictor, "process_frame"):
-            self.face_predictor.process_frame(frame)
-
-        # Detect faces on downscaled grayscale
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        detect_gray = cv2.resize(gray, self.display_cfg.face_detect_size)
-        faces = self.face_predictor.detect_faces(detect_gray)
+        # Get eye data for all detected faces
+        face_data_list = self.face_predictor.list_eye_data(frame, self.eye_config)
 
         # Process first detected face
-        for face in faces:
+        for face_data in face_data_list:
             try:
-                # Get landmarks
-                landmarks = self.face_predictor.predict_landmarks(
-                    gray, face, (self.display_cfg.x_ratio, self.display_cfg.y_ratio)
-                )
-                if landmarks is None:
-                    continue
-
-                # Extract eye data
-                face_data = self.face_predictor.extract_eye_data(
-                    display_frame, landmarks, self.eye_config
-                )
-
                 # Apply gaze correction
                 display_frame = self.gaze_corrector.apply_correction(
                     display_frame, face_data

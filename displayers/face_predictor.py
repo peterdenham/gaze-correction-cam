@@ -75,52 +75,23 @@ class FacePredictor(ABC):
     """Abstract base class for face prediction backends."""
 
     @abstractmethod
-    def detect_faces(self, gray_frame: np.ndarray) -> list:
-        """
-        Detect faces in a grayscale frame.
-
-        Args:
-            gray_frame: Grayscale image as numpy array
-
-        Returns:
-            List of detected face bounding boxes
-        """
-        pass
-
-    @abstractmethod
-    def predict_landmarks(
-        self, gray_frame: np.ndarray, face_bbox, frame_scale: tuple[float, float]
-    ) -> Optional[FaceLandmarks]:
-        """
-        Predict facial landmarks for a detected face.
-
-        Args:
-            gray_frame: Grayscale image as numpy array
-            face_bbox: Bounding box of detected face
-            frame_scale: (x_ratio, y_ratio) for scaling bbox to original frame
-
-        Returns:
-            FaceLandmarks object or None if prediction fails
-        """
-        pass
-
-    @abstractmethod
-    def extract_eye_data(
+    def list_eye_data(
         self,
         frame: np.ndarray,
-        landmarks: FaceLandmarks,
         config: EyeExtractionConfig,
-    ) -> FaceData:
+    ) -> list[FaceData]:
         """
-        Extract eye regions and prepare data for gaze correction model.
+        Detect faces and extract eye data for gaze correction.
+
+        This is the main public interface that combines face detection,
+        landmark prediction, and eye extraction into a single call.
 
         Args:
             frame: BGR video frame
-            landmarks: Detected face landmarks
             config: Eye extraction configuration
 
         Returns:
-            FaceData containing left and right eye data
+            List of FaceData objects for each detected face
         """
         pass
 
@@ -155,11 +126,11 @@ class DlibFacePredictor(FacePredictor):
         self.predictor = dlib.shape_predictor(predictor_path)
         self._dlib = dlib  # Keep reference for rectangle creation
 
-    def detect_faces(self, gray_frame: np.ndarray) -> list:
+    def _detect_faces(self, gray_frame: np.ndarray) -> list:
         """Detect faces using dlib's HOG-based detector."""
         return self.detector(gray_frame, 0)
 
-    def predict_landmarks(
+    def _predict_landmarks(
         self, gray_frame: np.ndarray, face_bbox, frame_scale: tuple[float, float]
     ) -> Optional[FaceLandmarks]:
         """Predict 68 facial landmarks and extract eye regions."""
@@ -201,7 +172,7 @@ class DlibFacePredictor(FacePredictor):
         cy = (shape.part(left_corner_idx).y + shape.part(right_corner_idx).y) * 0.5
         return (cx, cy)
 
-    def extract_eye_data(
+    def _extract_eye_data(
         self,
         frame: np.ndarray,
         landmarks: FaceLandmarks,
@@ -296,6 +267,30 @@ class DlibFacePredictor(FacePredictor):
             center=eye_landmarks.center,
         )
 
+    def list_eye_data(
+        self,
+        frame: np.ndarray,
+        config: EyeExtractionConfig,
+    ) -> list[FaceData]:
+        """Detect faces and extract eye data for gaze correction."""
+        results: list[FaceData] = []
+        
+        # Detect faces on grayscale
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = self._detect_faces(gray)
+        
+        for face in faces:
+            # Get landmarks (no scaling needed when using full frame)
+            landmarks = self._predict_landmarks(gray, face, (1.0, 1.0))
+            if landmarks is None:
+                continue
+            
+            # Extract eye data
+            face_data = self._extract_eye_data(frame, landmarks, config)
+            results.append(face_data)
+        
+        return results
+
     def get_name(self) -> str:
         return "dlib"
 
@@ -330,8 +325,6 @@ class MediaPipeFacePredictor(FacePredictor):
 
         self._mp = mp
         self._start_time = time()
-        self._frame_width = 640
-        self._frame_height = 480
 
         BaseOptions = mp.tasks.BaseOptions
         FaceLandmarker = mp.tasks.vision.FaceLandmarker
@@ -343,27 +336,49 @@ class MediaPipeFacePredictor(FacePredictor):
             running_mode=VisionRunningMode.VIDEO,
         )
         self.landmarker = FaceLandmarker.create_from_options(options)
-        self._last_result = None
 
-    def detect_faces(self, gray_frame: np.ndarray) -> list:
+    def _detect_landmarks(self, bgr_frame: np.ndarray) -> list[FaceLandmarks]:
         """
-        Detect faces using MediaPipe.
-        
-        Note: MediaPipe works on RGB, so we need to handle the conversion.
-        Returns a list of dummy bboxes since MediaPipe handles detection internally.
+        Detect faces and extract landmarks from a BGR frame.
+
+        Args:
+            bgr_frame: BGR video frame
+
+        Returns:
+            List of FaceLandmarks for each detected face
         """
-        return [1] if self._last_result and len(self._last_result.face_landmarks) > 0 else []
+        from time import time
 
-    def predict_landmarks(
-        self, gray_frame: np.ndarray, face_bbox, frame_scale: tuple[float, float]
-    ) -> Optional[FaceLandmarks]:
-        """Predict facial landmarks using MediaPipe."""
-        # Note: This method expects the original BGR frame to be passed via set_frame
-        if self._last_result is None or len(self._last_result.face_landmarks) == 0:
-            return None
+        h, w = bgr_frame.shape[:2]
+        mp_image = self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=bgr_frame)
+        timestamp_ms = int((time() - self._start_time) * 1000)
+        result = self.landmarker.detect_for_video(mp_image, timestamp_ms)
 
-        landmarks = self._last_result.face_landmarks[0]
-        h, w = self._frame_height, self._frame_width
+        if not result.face_landmarks:
+            return []
+
+        face_landmarks_list: list[FaceLandmarks] = []
+        for landmarks in result.face_landmarks:
+            face_lm = self._extract_eye_landmarks(landmarks, w, h)
+            face_landmarks_list.append(face_lm)
+
+        return face_landmarks_list
+
+    def _extract_eye_landmarks(
+        self, landmarks, frame_width: int, frame_height: int
+    ) -> FaceLandmarks:
+        """
+        Extract eye landmarks from MediaPipe face landmarks.
+
+        Args:
+            landmarks: MediaPipe normalized landmarks for a single face
+            frame_width: Frame width in pixels
+            frame_height: Frame height in pixels
+
+        Returns:
+            FaceLandmarks with left and right eye data
+        """
+        w, h = frame_width, frame_height
 
         # Extract left eye landmarks
         left_eye_points = [
@@ -389,19 +404,7 @@ class MediaPipeFacePredictor(FacePredictor):
 
         return FaceLandmarks(left_eye=left_eye, right_eye=right_eye, raw_shape=landmarks)
 
-    def process_frame(self, bgr_frame: np.ndarray) -> None:
-        """
-        Process a BGR frame with MediaPipe.
-        Must be called before detect_faces/predict_landmarks.
-        """
-        from time import time
-
-        self._frame_height, self._frame_width = bgr_frame.shape[:2]
-        mp_image = self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=bgr_frame)
-        timestamp_ms = int((time() - self._start_time) * 1000)
-        self._last_result = self.landmarker.detect_for_video(mp_image, timestamp_ms)
-
-    def extract_eye_data(
+    def _extract_eye_data(
         self,
         frame: np.ndarray,
         landmarks: FaceLandmarks,
@@ -457,7 +460,7 @@ class MediaPipeFacePredictor(FacePredictor):
 
         # Create anchor maps
         ach_map = None
-        for i, idx in enumerate(fp_seq):
+        for _, idx in enumerate(fp_seq):
             pt = points[idx]
             resize_x = int((pt[0] - lt_coord[1]) * size_I[1] / ori_size[1])
             resize_y = int((pt[1] - lt_coord[0]) * size_I[0] / ori_size[0])
@@ -484,6 +487,32 @@ class MediaPipeFacePredictor(FacePredictor):
             top_left=lt_coord,
             center=eye_landmarks.center,
         )
+
+    def list_eye_data(
+        self,
+        frame: np.ndarray,
+        config: EyeExtractionConfig,
+    ) -> list[FaceData]:
+        """
+        Detect faces and extract eye data for gaze correction.
+
+        Args:
+            frame: BGR video frame
+            config: Eye extraction configuration
+
+        Returns:
+            List of FaceData objects for each detected face
+        """
+        # Detect all face landmarks in a single call
+        all_face_landmarks = self._detect_landmarks(frame)
+
+        # Extract eye data for each detected face
+        results: list[FaceData] = []
+        for landmarks in all_face_landmarks:
+            face_data = self._extract_eye_data(frame, landmarks, config)
+            results.append(face_data)
+
+        return results
 
     def get_name(self) -> str:
         return "mediapipe"
