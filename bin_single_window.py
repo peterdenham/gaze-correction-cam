@@ -5,9 +5,9 @@ Single Window Gaze Correction Application
 A simplified gaze correction implementation using a single window.
 
 Usage:
-    python bin_single_window.py                    # Use dlib backend
+    python bin_single_window.py                      # Use dlib backend
     python bin_single_window.py --backend mediapipe  # Use mediapipe backend
-    python bin_single_window.py --camera 1         # Use camera device 1
+    python bin_single_window.py --camera 1           # Use camera device 1
 
 Controls:
     - 'g': Toggle gaze correction on/off

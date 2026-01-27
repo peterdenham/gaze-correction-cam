@@ -48,8 +48,8 @@ class DisplayConfig:
 class CalibrationConfig:
     """Configuration for calibration mode."""
 
-    step_xy: float = 0.5  # cm per key press for X/Y
-    step_z: float = 0.5   # cm per key press for Z
+    step_xy: float = 0.5      # cm per key press for X/Y
+    step_z: float = 0.5       # cm per key press for Z
     step_focal: float = 10.0  # pixels per key press for focal length
 
 
