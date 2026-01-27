@@ -16,7 +16,7 @@ Controls:
 """
 
 import cv2
-from displayers.single_window import SingleWindowGazeCorrector, DisplayConfig
+from displayers.dis_single_window import SingleWindowGazeCorrector, DisplayConfig
 from displayers.face_predictor import create_face_predictor
 
 
