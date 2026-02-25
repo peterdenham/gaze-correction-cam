@@ -62,6 +62,21 @@ def list_cameras(max_id: int = 9) -> list[tuple[int, int, int]]:
     return cameras
 
 
+def _get_camera_name_map() -> dict[int, str]:
+    """
+    Return {device_id: name} using AVFoundation (macOS).
+    Falls back to empty dict on any failure.
+    """
+    try:
+        import AVFoundation
+        devices = AVFoundation.AVCaptureDevice.devicesWithMediaType_(
+            AVFoundation.AVMediaTypeVideo
+        )
+        return {i: d.localizedName() for i, d in enumerate(devices)}
+    except Exception:
+        return {}
+
+
 def select_camera() -> int:
     """
     Interactively prompt the user to select a camera from detected devices.
@@ -71,6 +86,11 @@ def select_camera() -> int:
     """
     print("Scanning for available cameras...")
     cameras = list_cameras()
+    names = _get_camera_name_map()
+
+    def label(cam_id: int, w: int, h: int) -> str:
+        name = names.get(cam_id, f"Device {cam_id}")
+        return f"{name}  ({w}x{h})"
 
     if not cameras:
         print("No cameras detected. Defaulting to device 0.")
@@ -78,12 +98,12 @@ def select_camera() -> int:
 
     if len(cameras) == 1:
         cam_id, w, h = cameras[0]
-        print(f"Found 1 camera: device {cam_id} ({w}x{h}) — using it automatically.")
+        print(f"Found 1 camera: {label(cam_id, w, h)} — using it automatically.")
         return cam_id
 
     print(f"\nFound {len(cameras)} cameras:")
     for idx, (cam_id, w, h) in enumerate(cameras):
-        print(f"  [{idx}] Device {cam_id}  ({w}x{h})")
+        print(f"  [{idx}] {label(cam_id, w, h)}")
 
     while True:
         try:
