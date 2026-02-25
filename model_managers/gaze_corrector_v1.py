@@ -463,15 +463,23 @@ class GazeCorrector:
         if actual_h <= 0 or actual_w <= 0:
             return
 
-        # Build soft elliptical mask — filled ellipse blurred to soft edges
+        # Build soft elliptical mask — filled ellipse blurred to soft edges.
+        # Inset the ellipse by ~1/6 of each half-axis so the Gaussian blur has
+        # room to decay to zero before reaching the corners.  Using
+        # BORDER_CONSTANT (zero-pad) prevents BORDER_REFLECT_101 from folding
+        # the high-value ellipse interior back into the corners, which would
+        # otherwise multiply against the model's black out-of-bounds border and
+        # produce visible dark tick-mark artifacts at each corner.
         mask = np.zeros((actual_h, actual_w), dtype=np.float32)
         cx, cy = actual_w // 2, actual_h // 2
-        cv2.ellipse(mask, (cx, cy), (max(1, cx - 1), max(1, cy - 1)), 0, 0, 360, 1.0, -1)
+        inset_x = max(2, cx // 6)
+        inset_y = max(2, cy // 6)
+        cv2.ellipse(mask, (cx, cy), (max(1, cx - inset_x), max(1, cy - inset_y)), 0, 0, 360, 1.0, -1)
 
         # Blur radius: ~1/4 of shorter dimension, forced odd
         blur_r = max(3, min(actual_h, actual_w) // 4)
         blur_r = blur_r if blur_r % 2 == 1 else blur_r + 1
-        mask = cv2.GaussianBlur(mask, (blur_r, blur_r), 0)[..., np.newaxis]  # (H, W, 1)
+        mask = cv2.GaussianBlur(mask, (blur_r, blur_r), 0, borderType=cv2.BORDER_CONSTANT)[..., np.newaxis]  # (H, W, 1)
 
         roi = frame[top:bottom, left:right].astype(np.float32)
         corrected_255 = np.clip(corrected[:actual_h, :actual_w] * 255.0, 0.0, 255.0)
@@ -495,7 +503,17 @@ class GazeCorrector:
         result = self.model.infer_eye(
             eye_side, eye_data.image, eye_data.anchor_map, angle
         )
-        # Resize back to original size
+        # Crop the model's ~3px dark border before resizing.  The spatial
+        # transformer outputs zero (black) wherever it samples outside the
+        # source image bounds, leaving a dark fringe along all four edges.
+        # The soft elliptical mask in _blend_eye still has significant weight
+        # close to the bounding-box edge (it can't decay to zero over just a
+        # few pixels), so without this crop those black pixels composite
+        # visibly into the output frame.  48→42 / 64→58 retains >87% of the
+        # model's prediction area and the resize back to original size fills
+        # the full eye region cleanly.
+        B = 3
+        result = result[B:-B, B:-B]
         return cv2.resize(result, (eye_data.original_size[1], eye_data.original_size[0]))
 
     def apply_correction(self, frame: np.ndarray, face_data, video_size: tuple[int, int]) -> np.ndarray:
