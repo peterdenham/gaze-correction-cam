@@ -180,11 +180,11 @@ Examples:
     parser.add_argument(
         "--eye-scale",
         type=float,
-        default=0.92,
+        default=0.85,
         dest="eye_scale",
-        help="Scale factor for corrected eye patch (default: 0.92). "
+        help="Scale factor for corrected eye patch (default: 0.85). "
              "Reduces the warp model's tendency to make eyes look larger. "
-             "Use 1.0 to disable, lower values (e.g. 0.88) for more reduction.",
+             "Use 1.0 to disable, lower values for more reduction.",
     )
     args = parser.parse_args()
 
