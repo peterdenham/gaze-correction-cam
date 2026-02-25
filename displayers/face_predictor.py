@@ -222,10 +222,11 @@ class DlibFacePredictor(FacePredictor):
         sft_up = bx_h * 7 / 12
         sft_low = bx_h * 5 / 12
 
-        top = int(eye_cy - sft_up)
-        bottom = int(eye_cy + sft_low)
-        left = int(eye_cx - bx_half_w)
-        right = int(eye_cx + bx_half_w)
+        fh, fw = frame.shape[:2]
+        top = max(0, int(eye_cy - sft_up))
+        bottom = min(fh, int(eye_cy + sft_low))
+        left = max(0, int(eye_cx - bx_half_w))
+        right = min(fw, int(eye_cx + bx_half_w))
 
         # Extract and validate eye region
         img_eye = frame[top:bottom, left:right]
@@ -447,10 +448,11 @@ class MediaPipeFacePredictor(FacePredictor):
         sft_up = bx_h * 7 / 12
         sft_low = bx_h * 5 / 12
 
-        top = int(eye_cy - sft_up)
-        bottom = int(eye_cy + sft_low)
-        left = int(eye_cx - bx_half_w)
-        right = int(eye_cx + bx_half_w)
+        fh, fw = frame.shape[:2]
+        top = max(0, int(eye_cy - sft_up))
+        bottom = min(fh, int(eye_cy + sft_low))
+        left = max(0, int(eye_cx - bx_half_w))
+        right = min(fw, int(eye_cx + bx_half_w))
 
         img_eye = frame[top:bottom, left:right]
         if img_eye.size == 0:
