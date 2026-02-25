@@ -75,7 +75,8 @@ Rebuild with a single graph accepting a batch of `[left, right]` eye images to h
 TF1.x compat mode has no Metal GPU delegation — the warping model runs on CPU.
 The DeepWarp network is small (48×64 input, ~5 conv layers); exporting to TF Lite or CoreML
 would enable GPU/ANE acceleration on M-series chips. Estimated 3–5× inference speedup.
-Steps: export checkpoint → SavedModel → `tf.lite.TFLiteConverter` → validate output matches.
+Steps: export checkpoint → SavedModel → `ai_edge_litert.TFLiteConverter` (TF 2.20 deprecated
+`tf.lite` in favour of LiteRT — `pip install ai-edge-litert`) → validate output matches.
 
 **C — Face detection every N frames + optical flow tracking**
 `displayers/face_predictor.py:131`
