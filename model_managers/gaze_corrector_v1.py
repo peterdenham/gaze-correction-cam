@@ -248,9 +248,6 @@ class GazeCorrector:
         # Initialize model
         self.model = GazeModel(self.model_cfg)
 
-        # Pixel border to cut when replacing eyes (reduces edge artifacts)
-        self.pixel_cut = (3, 4)
-
         # Last estimated eye position (for visualization)
         self.last_eye_position: list[float] = [0, 0, -60]
 
@@ -439,6 +436,48 @@ class GazeCorrector:
 
         return [a_v, a_h], eye_position
 
+    def _blend_eye(self, frame: np.ndarray, corrected: np.ndarray, eye_data) -> None:
+        """
+        Blend a corrected eye patch into frame using a soft elliptical mask.
+
+        Rather than a hard cut-paste (which leaves seams when the corrected
+        patch differs in brightness/tone), this builds a Gaussian-blurred
+        elliptical mask centred on the eye and alpha-composites the result.
+        The mask fades to 0 at the boundary, so the output always transitions
+        smoothly back into the surrounding skin.
+
+        Args:
+            frame: BGR frame to modify in-place
+            corrected: Corrected eye image in [0, 1] float, shape (H, W, 3)
+            eye_data: EyeData with top_left and original_size
+        """
+        top, left = eye_data.top_left
+        orig_h, orig_w = eye_data.original_size
+
+        # Guard against clamped-to-zero slices
+        fh, fw = frame.shape[:2]
+        bottom = min(top + orig_h, fh)
+        right = min(left + orig_w, fw)
+        actual_h = bottom - top
+        actual_w = right - left
+        if actual_h <= 0 or actual_w <= 0:
+            return
+
+        # Build soft elliptical mask — filled ellipse blurred to soft edges
+        mask = np.zeros((actual_h, actual_w), dtype=np.float32)
+        cx, cy = actual_w // 2, actual_h // 2
+        cv2.ellipse(mask, (cx, cy), (max(1, cx - 1), max(1, cy - 1)), 0, 0, 360, 1.0, -1)
+
+        # Blur radius: ~1/4 of shorter dimension, forced odd
+        blur_r = max(3, min(actual_h, actual_w) // 4)
+        blur_r = blur_r if blur_r % 2 == 1 else blur_r + 1
+        mask = cv2.GaussianBlur(mask, (blur_r, blur_r), 0)[..., np.newaxis]  # (H, W, 1)
+
+        roi = frame[top:bottom, left:right].astype(np.float32)
+        corrected_255 = np.clip(corrected[:actual_h, :actual_w] * 255.0, 0.0, 255.0)
+        blended = corrected_255 * mask + roi * (1.0 - mask)
+        frame[top:bottom, left:right] = blended.astype(np.uint8)
+
     def correct_eye(
         self, eye_data, eye_side: str, angle: list[float]
     ) -> np.ndarray:
@@ -496,17 +535,9 @@ class GazeCorrector:
         le_corrected = fut_l.result()
         re_corrected = fut_r.result()
 
-        # Replace eye regions in frame (with border cropping)
-        pc = self.pixel_cut
-        frame[
-            le.top_left[0] + pc[0] : le.top_left[0] + le.original_size[0] - pc[0],
-            le.top_left[1] + pc[1] : le.top_left[1] + le.original_size[1] - pc[1],
-        ] = (le_corrected[pc[0] : -pc[0], pc[1] : -pc[1]] * 255)
-
-        frame[
-            re.top_left[0] + pc[0] : re.top_left[0] + re.original_size[0] - pc[0],
-            re.top_left[1] + pc[1] : re.top_left[1] + re.original_size[1] - pc[1],
-        ] = (re_corrected[pc[0] : -pc[0], pc[1] : -pc[1]] * 255)
+        # Blend corrected eye patches into frame with soft elliptical masks
+        self._blend_eye(frame, le_corrected, le)
+        self._blend_eye(frame, re_corrected, re)
 
         return frame
 
