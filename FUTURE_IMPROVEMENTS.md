@@ -11,6 +11,7 @@ Ordered roughly by impact. The two highest-impact items (#1 and #2) have already
 - **Feathered eye blending** — `bcd1d9d` — Gaussian elliptical mask replaces hard pixel_cut paste
 - **Eye bbox clamping** — `39465f6` — prevents NumPy index-wrap on faces near frame edges
 - **Delete `utils/config.py`** — `39465f6` — removed `type=eval` code injection vector
+- **Guided camera geometry calibration (D)** — `bin_calibrate.py` — interactive wizard solves `focal_length` and `camera_offset[1]` from screen dimensions, camera position, IPD, and a 5-second face capture
 
 ---
 
@@ -84,9 +85,7 @@ dlib HOG runs full-frame every frame. Standard approach: run detection every 3�
 propagate landmarks between detections with Lucas-Kanade optical flow (`cv2.calcOpticalFlowPyrLK`).
 Expected ~2–3× speedup on the detection step.
 
-**D — Guided one-time camera geometry calibration**
-`model_managers/gaze_corrector_v1.py:375`
-Default `focal_length=650`, `ipd=6.3cm`, `camera_offset=(0,-21,-1)` are guesses and wrong for
-most setups. The math to solve for actual values exists in `estimate_gaze_angle`. A guided
-procedure (stare at 4 screen corners, capture frames) could solve for `f` and `camera_offset`
-from the collected eye position data.
+**D — Guided one-time camera geometry calibration** ✅ SHIPPED
+`bin_calibrate.py` — CLI wizard: select screen size preset → camera position → enter IPD + sitting
+distance → 5-second face capture (measures ipd_px) → computes and saves calibrated `focal_length`
+and `camera_offset[1]`.  No TF model load required; saves directly via `UserSettingsDB`.
