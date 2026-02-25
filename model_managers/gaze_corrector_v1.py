@@ -10,6 +10,7 @@ import yaml
 import numpy as np
 import tensorflow as tf
 import cv2
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from tf_models.gaze_corrector_v1 import gaze_warp_model
@@ -252,6 +253,9 @@ class GazeCorrector:
         # Last estimated eye position (for visualization)
         self.last_eye_position: list[float] = [0, 0, -60]
 
+        # Reusable thread pool for parallel eye correction (avoids per-frame churn)
+        self._pool = ThreadPoolExecutor(max_workers=2)
+
     def _load_camera_settings(self) -> CameraUserSetting:
         """Load camera settings from database or return defaults."""
         saved = self.db.get_setting(self.setting_name)
@@ -470,9 +474,11 @@ class GazeCorrector:
         # Estimate gaze angle (video_size passed from outside)
         alpha, _ = self.estimate_gaze_angle(le.center, re.center, video_size)
 
-        # Correct both eyes
-        le_corrected = self.correct_eye(le, "L", alpha)
-        re_corrected = self.correct_eye(re, "R", alpha)
+        # Correct both eyes in parallel (independent TF graphs/sessions)
+        fut_l = self._pool.submit(self.correct_eye, le, "L", alpha)
+        fut_r = self._pool.submit(self.correct_eye, re, "R", alpha)
+        le_corrected = fut_l.result()
+        re_corrected = fut_r.result()
 
         # Replace eye regions in frame (with border cropping)
         pc = self.pixel_cut
@@ -490,4 +496,5 @@ class GazeCorrector:
 
     def close(self):
         """Release model resources."""
+        self._pool.shutdown(wait=True)
         self.model.close()
