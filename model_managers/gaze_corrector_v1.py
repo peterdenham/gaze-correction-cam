@@ -223,6 +223,7 @@ class GazeCorrector:
         db_path: str = "./user_settings.db",
         setting_name: str = "camera_default",
         smooth_alpha: float = 0.4,
+        eye_scale: float = 0.92,
     ):
         """
         Initialize gaze corrector.
@@ -255,6 +256,14 @@ class GazeCorrector:
         # alpha=1.0 disables smoothing (raw angles); lower values smooth more.
         self.smooth_alpha: float = smooth_alpha
         self._smoothed_angles: list[float] | None = None
+
+        # Scale factor applied to the corrected eye patch before blending.
+        # The spatial transformer warp tends to magnify the eye region slightly
+        # (it "pulls" pixels outward to redirect gaze), making eyes look bigger.
+        # Values < 1.0 shrink the corrected patch centered in the bbox so the
+        # apparent eye size matches the uncorrected frame.  0.92 compensates
+        # for roughly 5-15° of gaze correction.  Use 1.0 to disable.
+        self.eye_scale: float = eye_scale
 
         # Reusable thread pool for parallel eye correction (avoids per-frame churn)
         self._pool = ThreadPoolExecutor(max_workers=2)
@@ -483,6 +492,21 @@ class GazeCorrector:
 
         roi = frame[top:bottom, left:right].astype(np.float32)
         corrected_255 = np.clip(corrected[:actual_h, :actual_w] * 255.0, 0.0, 255.0)
+
+        # Counteract the spatial-transformer's tendency to magnify the eye.
+        # Shrink the corrected patch to eye_scale × bbox size, center it, and
+        # fill the surrounding area with the original frame pixels so the
+        # transition is seamless before the Gaussian mask is applied.
+        if self.eye_scale < 1.0:
+            sh = max(1, int(actual_h * self.eye_scale))
+            sw = max(1, int(actual_w * self.eye_scale))
+            shrunk = cv2.resize(corrected_255, (sw, sh))
+            scaled = roi.copy()
+            y0 = (actual_h - sh) // 2
+            x0 = (actual_w - sw) // 2
+            scaled[y0:y0 + sh, x0:x0 + sw] = shrunk
+            corrected_255 = scaled
+
         blended = corrected_255 * mask + roi * (1.0 - mask)
         frame[top:bottom, left:right] = blended.astype(np.uint8)
 

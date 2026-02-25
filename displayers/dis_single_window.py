@@ -96,6 +96,7 @@ class SingleWindowGazeCorrector:
         calibration_config: Optional[CalibrationConfig] = None,
         camera_id: int = 0,
         config_path: str = "./model_managers/gaze_corrector_v1_01.yaml",
+        eye_scale: float = 0.92,
     ):
         self.logger = Logger(self.__class__.__name__)
         self.display_cfg = display_config or DisplayConfig()
@@ -106,7 +107,7 @@ class SingleWindowGazeCorrector:
         self.logger.log(f"Using face predictor: {self.face_predictor.get_name()}")
 
         # Initialize gaze corrector (injectable)
-        self.gaze_corrector = gaze_corrector or GazeCorrector(config_path=config_path)
+        self.gaze_corrector = gaze_corrector or GazeCorrector(config_path=config_path, eye_scale=eye_scale)
 
         # Eye extraction config (matches model requirements)
         self.eye_config = EyeExtractionConfig()

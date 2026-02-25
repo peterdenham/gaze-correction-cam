@@ -177,6 +177,15 @@ Examples:
         default="./model_managers/gaze_corrector_v1_01.yaml",
         help="Path to gaze corrector config file (default: ./model_managers/gaze_corrector_v1_01.yaml)",
     )
+    parser.add_argument(
+        "--eye-scale",
+        type=float,
+        default=0.92,
+        dest="eye_scale",
+        help="Scale factor for corrected eye patch (default: 0.92). "
+             "Reduces the warp model's tendency to make eyes look larger. "
+             "Use 1.0 to disable, lower values (e.g. 0.88) for more reduction.",
+    )
     args = parser.parse_args()
 
     # Resolve camera: interactive picker if --camera not provided
@@ -205,6 +214,7 @@ Examples:
         display_config=display_config,
         camera_id=camera_id,
         config_path=args.config,
+        eye_scale=args.eye_scale,
     )
     corrector.run()
 
