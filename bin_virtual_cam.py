@@ -79,6 +79,14 @@ Examples:
         action="store_true",
         help="Send raw camera frames without gaze correction (debug)",
     )
+    parser.add_argument(
+        "--eye-scale",
+        type=float,
+        default=0.85,
+        dest="eye_scale",
+        help="Scale factor for corrected eye patch (default: 0.85). "
+             "Reduces warp magnification. Use 1.0 to disable.",
+    )
     args = parser.parse_args()
 
     camera_id = args.camera if args.camera is not None else select_camera()
@@ -96,6 +104,7 @@ Examples:
             display_config=display_config,
             camera_id=camera_id,
             config_path=args.config,
+            eye_scale=args.eye_scale,
         )
 
     cap = cv2.VideoCapture(camera_id)

@@ -48,9 +48,10 @@ class DisplayConfig:
 class CalibrationConfig:
     """Configuration for calibration mode."""
 
-    step_xy: float = 0.5      # cm per key press for X/Y
-    step_z: float = 0.5       # cm per key press for Z
-    step_focal: float = 10.0  # pixels per key press for focal length
+    step_xy: float = 0.5        # cm per key press for X/Y
+    step_z: float = 0.5         # cm per key press for Z
+    step_focal: float = 10.0    # pixels per key press for focal length
+    step_eye_scale: float = 0.01  # scale units per key press
 
 
 ################################################################################
@@ -120,6 +121,7 @@ class SingleWindowGazeCorrector:
         # Store default values for reset
         self.default_camera_offset = self.gaze_corrector.get_camera_offset()
         self.default_focal_length = self.gaze_corrector.get_focal_length()
+        self.default_eye_scale = self.gaze_corrector.get_eye_scale()
 
     def draw_status(self, frame) -> None:
         """Draw status overlay on frame."""
@@ -142,7 +144,7 @@ class SingleWindowGazeCorrector:
 
         # Semi-transparent overlay background
         overlay = frame.copy()
-        cv2.rectangle(overlay, (w - 260, 10), (w - 10, 245), (40, 40, 40), -1)
+        cv2.rectangle(overlay, (w - 260, 10), (w - 10, 265), (40, 40, 40), -1)
         cv2.addWeighted(overlay, 0.7, frame, 0.3, 0, frame)
 
         # Title
@@ -196,10 +198,17 @@ class SingleWindowGazeCorrector:
             cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 200, 255), 1, cv2.LINE_AA
         )
 
+        # Eye scale
+        eye_scale = self.gaze_corrector.get_eye_scale()
+        cv2.putText(
+            frame, f"Eye Scale:  {eye_scale:.2f}", (w - 250, 235),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 230, 150), 1, cv2.LINE_AA
+        )
+
         # Controls hint
         cv2.putText(
-            frame, "[Arrows:XY] [+/-:Z] [[/]:F] [R:Reset]", (w - 250, 235),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.32, (180, 180, 180), 1, cv2.LINE_AA
+            frame, "[Arrows:XY] [+/-:Z] [[/]:F] [,/.:S] [R:Reset]", (w - 250, 255),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.30, (180, 180, 180), 1, cv2.LINE_AA
         )
 
         # Draw camera position diagram (bottom left)
@@ -308,11 +317,18 @@ class SingleWindowGazeCorrector:
         elif key == ord("]"):
             self.gaze_corrector.adjust_focal_length(self.calib_cfg.step_focal)
             return True
+        elif key == ord(",") or key == ord("<"):
+            self.gaze_corrector.adjust_eye_scale(-self.calib_cfg.step_eye_scale)
+            return True
+        elif key == ord(".") or key == ord(">"):
+            self.gaze_corrector.adjust_eye_scale(self.calib_cfg.step_eye_scale)
+            return True
         elif key == ord("r"):
             x, y, z = self.default_camera_offset
             self.gaze_corrector.set_camera_offset(x, y, z)
             self.gaze_corrector.set_focal_length(self.default_focal_length)
-            self.logger.log("Camera offset and focal length reset to default")
+            self.gaze_corrector.eye_scale = self.default_eye_scale
+            self.logger.log("Camera settings reset to default")
             return True
 
         return False

@@ -381,6 +381,27 @@ class GazeCorrector:
         self.logger.log(f"IPD set to: {ipd:.1f} cm")
 
     ############################################################################
+    # Eye Scale Adjustment API
+    ############################################################################
+
+    def get_eye_scale(self) -> float:
+        """Get current eye scale factor."""
+        return self.eye_scale
+
+    def adjust_eye_scale(self, delta: float) -> float:
+        """
+        Adjust eye scale by delta, clamped to [0.5, 1.0].
+
+        Args:
+            delta: Change in scale (positive = larger, negative = smaller)
+
+        Returns:
+            New eye scale value
+        """
+        self.eye_scale = max(0.5, min(1.0, self.eye_scale + delta))
+        return self.eye_scale
+
+    ############################################################################
     # Gaze Estimation and Correction
     ############################################################################
 
