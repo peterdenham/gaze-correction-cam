@@ -222,6 +222,7 @@ class GazeCorrector:
         config_path: str = "./model_managers/gaze_corrector_v1_01.yaml",
         db_path: str = "./user_settings.db",
         setting_name: str = "camera_default",
+        smooth_alpha: float = 0.4,
     ):
         """
         Initialize gaze corrector.
@@ -252,6 +253,11 @@ class GazeCorrector:
 
         # Last estimated eye position (for visualization)
         self.last_eye_position: list[float] = [0, 0, -60]
+
+        # EMA smoothing for correction angles — reduces frame-to-frame jitter.
+        # alpha=1.0 disables smoothing (raw angles); lower values smooth more.
+        self.smooth_alpha: float = smooth_alpha
+        self._smoothed_angles: list[float] | None = None
 
         # Reusable thread pool for parallel eye correction (avoids per-frame churn)
         self._pool = ThreadPoolExecutor(max_workers=2)
@@ -431,10 +437,10 @@ class GazeCorrector:
             math.atan((eye_x - settings.camera_offset[0]) / (settings.camera_offset[2] - eye_z))
         )
 
-        return [int(a_v), int(a_h)], eye_position
+        return [a_v, a_h], eye_position
 
     def correct_eye(
-        self, eye_data, eye_side: str, angle: list[int]
+        self, eye_data, eye_side: str, angle: list[float]
     ) -> np.ndarray:
         """
         Apply gaze correction to a single eye.
@@ -473,6 +479,16 @@ class GazeCorrector:
 
         # Estimate gaze angle (video_size passed from outside)
         alpha, _ = self.estimate_gaze_angle(le.center, re.center, video_size)
+
+        # EMA smoothing: blend new angle with history to reduce jitter.
+        # On first detection, seed with the raw angle (no lag on startup).
+        if self._smoothed_angles is None:
+            self._smoothed_angles = list(alpha)
+        else:
+            a = self.smooth_alpha
+            self._smoothed_angles[0] = a * alpha[0] + (1 - a) * self._smoothed_angles[0]
+            self._smoothed_angles[1] = a * alpha[1] + (1 - a) * self._smoothed_angles[1]
+        alpha = self._smoothed_angles
 
         # Correct both eyes in parallel (independent TF graphs/sessions)
         fut_l = self._pool.submit(self.correct_eye, le, "L", alpha)
