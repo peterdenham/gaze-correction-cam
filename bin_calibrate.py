@@ -354,7 +354,7 @@ Run once when setting up on a new screen or changing your camera position.
         db = UserSettingsDB(args.db)
         db.save_setting(args.setting, new_settings.to_dict())
         print(f"\n✓  Saved to '{args.db}'  (setting: '{args.setting}').")
-        print("   Run bin_single_window.py (or bin_virtual_cam.py) to use the")
+        print("   Run gaze_correct.py (or virtual_cam.py) to use the")
         print("   new calibration.")
     else:
         print("  Settings not saved.")

@@ -5,9 +5,10 @@ This is a Python 3.12+ macOS-only gaze correction application using TensorFlow (
 
 ## Build & Run Commands
 - Install dependencies: `poetry install`
-- Run main application: `poetry run python bin_single_window.py`
-- Run with MediaPipe backend: `poetry run python bin_single_window.py --backend mediapipe`
-- Run virtual camera: `poetry run python bin_virtual_cam.py`
+- Run main application: `poetry run python gaze_correct.py`
+- Run with MediaPipe backend: `poetry run python gaze_correct.py --backend mediapipe`
+- Run virtual camera: `poetry run python virtual_cam.py`
+- Run calibration wizard: `poetry run python bin_calibrate.py`
 - Format code: `poetry run black .` (uses black formatter)
 - Test scripts: `bin_test_dlib_detection.py` and `bin_test_mediapipe_detection.py` (visual tests only)
 

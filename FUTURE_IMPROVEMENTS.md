@@ -60,7 +60,7 @@ Measurable but not dramatic improvement (~1ms/frame saved).
 **#9 — Unnecessary frame copy in single-window mode**
 `displayers/dis_single_window.py:329`
 `display_frame = frame.copy()` — the frame is freshly read from `cap.read()` and not shared
-with any other thread in the single-window path. The copy is only needed in `bin_virtual_cam.py`
+with any other thread in the single-window path. The copy is only needed in `virtual_cam.py`
 where `process_thread` holds the raw frame slot. Can remove the copy in `run()`.
 
 ---

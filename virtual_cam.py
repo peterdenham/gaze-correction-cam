@@ -7,10 +7,10 @@ camera device, making it available as a source in OBS and video conferencing
 apps.
 
 Usage:
-    python bin_virtual_cam.py                      # Use dlib backend
-    python bin_virtual_cam.py --backend mediapipe  # Use mediapipe backend
-    python bin_virtual_cam.py --camera 4           # Use camera device 4
-    python bin_virtual_cam.py --passthrough        # Raw camera, no correction (debug)
+    python virtual_cam.py                      # Use dlib backend
+    python virtual_cam.py --backend mediapipe  # Use mediapipe backend
+    python virtual_cam.py --camera 4           # Use camera device 4
+    python virtual_cam.py --passthrough        # Raw camera, no correction (debug)
 
 In OBS:
     Add Source → Video Capture Device → select "OBS Virtual Camera"
@@ -31,7 +31,7 @@ import cv2
 import numpy as np
 import pyvirtualcam
 
-from bin_single_window import detect_camera_resolution, select_camera
+from gaze_correct import detect_camera_resolution, select_camera
 from displayers.dis_single_window import DisplayConfig, SingleWindowGazeCorrector
 from displayers.face_predictor import create_face_predictor
 

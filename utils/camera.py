@@ -1,7 +1,7 @@
 """
 Camera enumeration and interactive selection utilities.
 
-Shared by bin_single_window.py, bin_virtual_cam.py, and bin_calibrate.py.
+Shared by gaze_correct.py, virtual_cam.py, and bin_calibrate.py.
 
 Why the preview step exists
 ----------------------------

@@ -5,9 +5,9 @@ Single Window Gaze Correction Application
 A simplified gaze correction implementation using a single window.
 
 Usage:
-    python bin_single_window.py                      # Use dlib backend
-    python bin_single_window.py --backend mediapipe  # Use mediapipe backend
-    python bin_single_window.py --camera 1           # Use camera device 1
+    python gaze_correct.py                      # Use dlib backend
+    python gaze_correct.py --backend mediapipe  # Use mediapipe backend
+    python gaze_correct.py --camera 1           # Use camera device 1
 
 Controls:
     - 'g': Toggle gaze correction on/off
@@ -19,7 +19,7 @@ import sys
 import cv2
 from displayers.dis_single_window import SingleWindowGazeCorrector, DisplayConfig
 from displayers.face_predictor import create_face_predictor
-from utils.camera import detect_camera_resolution, list_cameras, select_camera  # noqa: F401 (re-exported for bin_virtual_cam)
+from utils.camera import detect_camera_resolution, list_cameras, select_camera  # noqa: F401 (re-exported for virtual_cam)
 
 
 def main():

@@ -65,20 +65,23 @@ The following dependencies are required to run this application:
 
 ## Usage
 
-### Single Window Application (Recommended)
-
-Run the simplified single-window gaze correction application:
+### Gaze Correction — Single Window (Recommended)
 
 ```bash
-# Using default dlib backend
-poetry run python bin_single_window.py
+# Default dlib backend — interactive camera picker on first run
+poetry run python gaze_correct.py
 
-# Using MediaPipe backend (requires face_landmarker.task)
-poetry run python bin_single_window.py --backend mediapipe
+# MediaPipe backend (requires models/face_landmarker.task)
+poetry run python gaze_correct.py --backend mediapipe
 
-# Specify camera device
-poetry run python bin_single_window.py --camera 0
+# Skip the picker and specify a camera directly
+poetry run python gaze_correct.py --camera 0
+
+# Adjust eye-patch scale to reduce magnification (default: 0.85)
+poetry run python gaze_correct.py --eye-scale 0.85
 ```
+
+**Camera picker:** Omitting `--camera` opens an interactive list of all detected cameras with a live preview window so you can confirm the right device before starting.
 
 #### Controls
 
@@ -97,6 +100,7 @@ When calibration mode is enabled (press `c`):
 | Arrow keys (`↑` `↓` `←` `→`) | Adjust camera offset X/Y (±0.5 cm)     |
 | `+` / `-`                    | Adjust camera offset Z depth (±0.5 cm) |
 | `[` / `]`                    | Adjust focal length (±10 pixels)       |
+| `e` / `E`                    | Adjust eye-patch scale (±0.05)         |
 | `r`                          | Reset to default values                |
 
 The calibration overlay displays:
@@ -104,7 +108,48 @@ The calibration overlay displays:
 - Current camera offset (X, Y, Z in cm)
 - Estimated eye position (X, Y, Z in cm)
 - Current focal length (in pixels)
+- Current eye-patch scale
 - Top-view diagram showing camera, screen, and eye positions
+
+---
+
+### Virtual Camera — OBS Output
+
+Stream gaze-corrected video to a virtual camera device (OBS, video conferencing apps):
+
+```bash
+# Start virtual camera with gaze correction
+poetry run python virtual_cam.py
+
+# Specify backend and camera
+poetry run python virtual_cam.py --backend mediapipe --camera 4
+
+# Pass raw frames without correction (debug)
+poetry run python virtual_cam.py --passthrough
+```
+
+In OBS: **Add Source → Video Capture Device → "OBS Virtual Camera"**
+
+> **Prerequisite:** OBS must be installed and Virtual Camera must be started from OBS Controls before running.
+
+---
+
+### Geometry Calibration Wizard
+
+Solve accurate `focal_length` and `camera_offset` from your physical setup — run once per screen/camera configuration:
+
+```bash
+poetry run python bin_calibrate.py
+```
+
+The wizard walks through four steps:
+
+1. **Screen size** — pick a preset or enter exact height in cm
+2. **Camera position** — how far the lens sits above the top screen edge
+3. **Your measurements** — inter-pupillary distance (IPD) and sitting distance
+4. **Face capture** — 5-second automated IPD measurement via live camera
+
+Settings are saved to `user_settings.db` and loaded automatically by `gaze_correct.py` and `virtual_cam.py`.
 
 ## System Requirements
 
@@ -120,21 +165,34 @@ This is a **real-time gaze correction system** that redirects eye gaze in video 
 
 ### File Structure & Module Organization
 
-#### 1. Entry Points (bin\_\*.py)
+#### 1. Entry Points
 
-##### bin*single_window.py ⭐ \_Main Application*
+##### gaze_correct.py ⭐ Main Application
 
 - **Purpose**: Single-window gaze correction app with real-time controls
 - **Features**:
+  - Interactive camera picker with live preview (`--camera` optional)
   - Auto-detects camera resolution
   - Toggle gaze correction on/off (`g` key)
-  - Calibration mode for camera offset adjustment (`c` key)
+  - Calibration mode for camera offset and eye-scale adjustment (`c` key)
+  - `--eye-scale` flag to reduce warp magnification (default: 0.85)
   - Supports multiple backends (dlib/MediaPipe)
 - **Flow**: `Camera Input → FacePredictor → GazeCorrector → Display Output`
 
+##### virtual_cam.py
+
+- **Purpose**: Headless pipeline that outputs corrected frames to a virtual camera device
+- **Use case**: OBS, Zoom, Teams — any app that reads from a camera
+- **Features**: Same backends and `--eye-scale` as `gaze_correct.py`, plus `--passthrough` for debug
+
+##### bin_calibrate.py
+
+- **Purpose**: Guided geometry calibration wizard — solves `focal_length` and `camera_offset` from physical measurements + a 5-second face capture
+- **Output**: Saves to `user_settings.db`, loaded automatically by the other entry points
+
 ##### bin_focal_length_calibration.py
 
-- Standalone tool for camera focal length calibration
+- Legacy standalone tool for camera focal length calibration
 
 ##### bin_test_mediapipe_detection.py
 
@@ -304,7 +362,7 @@ Corrected Eye Image
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        MAIN APPLICATION                         │
-│                     (bin_single_window.py)                      │
+│                       (gaze_correct.py)                          │
 └──────────────────────┬──────────────────────────────────────────┘
                        │
                        ↓
