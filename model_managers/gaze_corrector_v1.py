@@ -11,7 +11,7 @@ import numpy as np
 import tensorflow as tf
 import cv2
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from tf_models.gaze_corrector_v1 import gaze_warp_model
 from utils.logger import Logger
@@ -256,12 +256,6 @@ class GazeCorrector:
         # alpha=1.0 disables smoothing (raw angles); lower values smooth more.
         self.smooth_alpha: float = smooth_alpha
         self._smoothed_angles: list[float] | None = None
-
-        # EMA smoothing for eye center positions — stabilises the bbox paste
-        # position so the overlay doesn't jitter when the face is still.
-        # Uses the same smooth_alpha as angle smoothing.
-        self._smoothed_le_center: list[float] | None = None
-        self._smoothed_re_center: list[float] | None = None
 
         # Scale factor applied to the corrected eye patch before blending.
         # The spatial transformer warp tends to magnify the eye region slightly
@@ -585,58 +579,28 @@ class GazeCorrector:
         le = face_data.left_eye
         re = face_data.right_eye
 
-        # EMA-smooth eye center positions to stabilise the overlay paste
-        # position.  Landmark detectors produce ±1–3 px noise even on a still
-        # face; smoothing here eliminates the resulting bbox jitter without
-        # affecting the correction angle (which is already smoothed below).
-        a = self.smooth_alpha
-        if self._smoothed_le_center is None:
-            self._smoothed_le_center = list(le.center)
-            self._smoothed_re_center = list(re.center)
-        else:
-            self._smoothed_le_center[0] = a * le.center[0] + (1 - a) * self._smoothed_le_center[0]
-            self._smoothed_le_center[1] = a * le.center[1] + (1 - a) * self._smoothed_le_center[1]
-            self._smoothed_re_center[0] = a * re.center[0] + (1 - a) * self._smoothed_re_center[0]
-            self._smoothed_re_center[1] = a * re.center[1] + (1 - a) * self._smoothed_re_center[1]
+        # Estimate gaze angle (video_size passed from outside)
+        alpha, _ = self.estimate_gaze_angle(le.center, re.center, video_size)
 
-        # Estimate gaze angle using smoothed centers (video_size passed from outside)
-        alpha, _ = self.estimate_gaze_angle(
-            (self._smoothed_le_center[0], self._smoothed_le_center[1]),
-            (self._smoothed_re_center[0], self._smoothed_re_center[1]),
-            video_size,
-        )
-
-        # EMA smoothing on the correction angles themselves.
+        # EMA smoothing: blend new angle with history to reduce jitter.
+        # On first detection, seed with the raw angle (no lag on startup).
         if self._smoothed_angles is None:
             self._smoothed_angles = list(alpha)
         else:
+            a = self.smooth_alpha
             self._smoothed_angles[0] = a * alpha[0] + (1 - a) * self._smoothed_angles[0]
             self._smoothed_angles[1] = a * alpha[1] + (1 - a) * self._smoothed_angles[1]
         alpha = self._smoothed_angles
 
-        # Correct both eyes in parallel (independent TF graphs/sessions).
-        # Model inference uses eye_data.image, which is not affected by top_left.
+        # Correct both eyes in parallel (independent TF graphs/sessions)
         fut_l = self._pool.submit(self.correct_eye, le, "L", alpha)
         fut_r = self._pool.submit(self.correct_eye, re, "R", alpha)
         le_corrected = fut_l.result()
         re_corrected = fut_r.result()
 
-        # Build adjusted EyeData with smoothed paste position for blending.
-        # top_left is (row, col); center is (x, y) so row = center_y - h/2.
-        le_h, le_w = le.original_size
-        le_for_blend = replace(le, top_left=(
-            int(round(self._smoothed_le_center[1] - le_h / 2)),
-            int(round(self._smoothed_le_center[0] - le_w / 2)),
-        ))
-        re_h, re_w = re.original_size
-        re_for_blend = replace(re, top_left=(
-            int(round(self._smoothed_re_center[1] - re_h / 2)),
-            int(round(self._smoothed_re_center[0] - re_w / 2)),
-        ))
-
         # Blend corrected eye patches into frame with soft elliptical masks
-        self._blend_eye(frame, le_corrected, le_for_blend)
-        self._blend_eye(frame, re_corrected, re_for_blend)
+        self._blend_eye(frame, le_corrected, le)
+        self._blend_eye(frame, re_corrected, re)
 
         return frame
 
