@@ -12,7 +12,6 @@ Usage:
 """
 
 import math
-import os
 import statistics
 import sys
 import time
@@ -20,92 +19,13 @@ import time
 import cv2
 import numpy as np
 
-# AVFoundation camera name lookup (macOS only — falls back to empty dict)
-try:
-    import AVFoundation as _AVF
-
-    def _camera_name_map() -> dict[int, str]:
-        devices = _AVF.AVCaptureDevice.devicesWithMediaType_(_AVF.AVMediaTypeVideo)
-        return {i: d.localizedName() for i, d in enumerate(devices)}
-except Exception:
-    def _camera_name_map() -> dict[int, str]:
-        return {}
-
-
-def _list_cameras(max_id: int = 9) -> list[tuple[int, int, int]]:
-    """Probe camera device IDs and return (device_id, width, height) for each found."""
-    devnull_fd = os.open(os.devnull, os.O_WRONLY)
-    saved_stderr = os.dup(2)
-    os.dup2(devnull_fd, 2)
-    try:
-        results = []
-        for i in range(max_id + 1):
-            cap = cv2.VideoCapture(i)
-            opened = cap.isOpened()
-            w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) if opened else 0
-            h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) if opened else 0
-            cap.release()
-            results.append((i, opened, w, h))
-    finally:
-        os.dup2(saved_stderr, 2)
-        os.close(saved_stderr)
-        os.close(devnull_fd)
-
-    cameras: list[tuple[int, int, int]] = []
-    consecutive_misses = 0
-    for i, opened, w, h in results:
-        if opened:
-            cameras.append((i, w, h))
-            consecutive_misses = 0
-        else:
-            consecutive_misses += 1
-            if cameras and consecutive_misses >= 2:
-                break
-            if not cameras and i >= 2:
-                break
-    return cameras
-
-
-def _select_camera() -> int:
-    """Interactively prompt the user to pick a camera. Returns the device ID."""
-    print("  Scanning for cameras...")
-    cameras = _list_cameras()
-    names = _camera_name_map()
-
-    def label(cam_id: int, w: int, h: int) -> str:
-        name = names.get(cam_id, f"Device {cam_id}")
-        return f"{name}  ({w}×{h})"
-
-    if not cameras:
-        print("  No cameras detected — defaulting to device 0.")
-        return 0
-
-    if len(cameras) == 1:
-        cam_id, w, h = cameras[0]
-        print(f"  Found 1 camera: {label(cam_id, w, h)} — using it automatically.")
-        return cam_id
-
-    print(f"  Found {len(cameras)} cameras:")
-    for idx, (cam_id, w, h) in enumerate(cameras):
-        print(f"    [{idx}] {label(cam_id, w, h)}")
-
-    while True:
-        try:
-            choice = input(f"  Select camera [0-{len(cameras) - 1}]: ").strip()
-            n = int(choice)
-            if 0 <= n < len(cameras):
-                return cameras[n][0]
-            print(f"  Enter a number between 0 and {len(cameras) - 1}.")
-        except (ValueError, EOFError):
-            print("  Invalid input.")
-
-
 from displayers.face_predictor import (
     EyeExtractionConfig,
     create_face_predictor,
 )
 from model_managers.gaze_corrector_v1 import CameraUserSetting
 from model_managers.user_settings_db import UserSettingsDB
+from utils.camera import select_camera as _select_camera
 
 
 # ── Screen and camera presets ─────────────────────────────────────────────────
